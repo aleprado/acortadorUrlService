@@ -5,6 +5,7 @@ import (
 	"acortadorUrlService/components/logger"
 	"acortadorUrlService/url-api/service"
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"acortadorUrlService/components/metrics"
@@ -21,38 +22,56 @@ func NewUrlController(s *service.UrlShortener, cfg *config.AppConfig) *UrlContro
 	return &UrlController{Shortener: s, Config: cfg}
 }
 
-func (c *UrlController) MountIn(r chi.Router) {
-	r.Route("/shorten", func(r chi.Router) {
-		r.Get("/", c.GetShortUrl)
-		r.Delete("/", c.DeleteShortUrl)
-		r.Get("/{hash}", c.ResolveShortUrl)
-	})
+type CreateShortUrlRequest struct {
+	URL string `json:"url"`
 }
 
-func (c *UrlController) GetShortUrl(w http.ResponseWriter, r *http.Request) {
-	originalURL := r.URL.Query().Get("url")
-	if originalURL == "" {
-		metrics.PutCountMetric(metrics.MetricGetShortUrlMissingParam, 1)
-		http.Error(w, "Missing 'url' query parameter", http.StatusBadRequest)
-		logger.LogError("Missing URL parameter", nil)
+func (c *UrlController) MountIn(r chi.Router) {
+	r.Post("/", c.CreateShortUrl)
+	r.Delete("/", c.DeleteShortUrl)
+	r.Get("/{hash}", c.ResolveShortUrl)
+}
+
+func (c *UrlController) CreateShortUrl(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		metrics.PutCountMetric(metrics.MetricPostShortUrlError, 1)
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		logger.LogError("Failed to read request body", err)
+		return
+	}
+	defer r.Body.Close()
+
+	var req CreateShortUrlRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		metrics.PutCountMetric(metrics.MetricPostShortUrlError, 1)
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		logger.LogError("Invalid JSON format", err)
 		return
 	}
 
-	shortened, err := c.Shortener.ShortenOrFetch(r.Context(), originalURL)
+	if req.URL == "" {
+		metrics.PutCountMetric(metrics.MetricPostShortUrlMissingParam, 1)
+		http.Error(w, "Missing 'url' in request body", http.StatusBadRequest)
+		logger.LogError("Missing URL in request body", nil)
+		return
+	}
+
+	shortened, err := c.Shortener.ShortenOrFetch(r.Context(), req.URL)
 	if err != nil {
-		metrics.PutCountMetric(metrics.MetricGetShortUrlError, 1)
+		metrics.PutCountMetric(metrics.MetricPostShortUrlError, 1)
 		http.Error(w, "Failed to shorten URL", http.StatusInternalServerError)
 		logger.LogError("ShortenOrFetch error", err)
 		return
 	}
 
 	if !shortened.CreatedAt.IsZero() {
-		metrics.PutCountMetric(metrics.MetricGetShortUrlCreatedNew, 1)
+		metrics.PutCountMetric(metrics.MetricPostShortUrlCreatedNew, 1)
 	} else {
-		metrics.PutCountMetric(metrics.MetricGetShortUrlFoundExisting, 1)
+		metrics.PutCountMetric(metrics.MetricPostShortUrlFoundExisting, 1)
 	}
 
-	metrics.PutCountMetric(metrics.MetricGetShortUrlSuccess, 1)
+	metrics.PutCountMetric(metrics.MetricPostShortUrlSuccess, 1)
 	response := map[string]string{
 		"short_url": c.Config.BaseURL + "/" + shortened.Hash,
 		"original":  shortened.Original,
@@ -63,15 +82,31 @@ func (c *UrlController) GetShortUrl(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *UrlController) DeleteShortUrl(w http.ResponseWriter, r *http.Request) {
-	originalURL := r.URL.Query().Get("url")
-	if originalURL == "" {
-		metrics.PutCountMetric(metrics.MetricDeleteShortUrlMissingParam, 1)
-		http.Error(w, "Missing 'url' query parameter", http.StatusBadRequest)
-		logger.LogError("Missing URL parameter", nil)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		metrics.PutCountMetric(metrics.MetricDeleteShortUrlError, 1)
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		logger.LogError("Failed to read request body", err)
+		return
+	}
+	defer r.Body.Close()
+
+	var req CreateShortUrlRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		metrics.PutCountMetric(metrics.MetricDeleteShortUrlError, 1)
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		logger.LogError("Invalid JSON format", err)
 		return
 	}
 
-	err := c.Shortener.Delete(r.Context(), originalURL)
+	if req.URL == "" {
+		metrics.PutCountMetric(metrics.MetricDeleteShortUrlMissingParam, 1)
+		http.Error(w, "Missing 'url' in request body", http.StatusBadRequest)
+		logger.LogError("Missing URL in request body", nil)
+		return
+	}
+
+	err = c.Shortener.Delete(r.Context(), req.URL)
 	if err != nil {
 		metrics.PutCountMetric(metrics.MetricDeleteShortUrlError, 1)
 		http.Error(w, "Failed to delete short URL", http.StatusInternalServerError)
@@ -80,6 +115,7 @@ func (c *UrlController) DeleteShortUrl(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metrics.PutCountMetric(metrics.MetricDeleteShortUrlSuccess, 1)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (c *UrlController) ResolveShortUrl(w http.ResponseWriter, r *http.Request) {

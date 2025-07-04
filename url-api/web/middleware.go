@@ -35,14 +35,14 @@ func Metrics(next http.Handler) http.Handler {
 		start := time.Now()
 		next.ServeHTTP(w, r)
 		duration := time.Since(start).Milliseconds()
-		// Currently the DNS is public , any bot or person can reach it. To avoid generating a metric name per path per request recived 
+
 		var metricName string
 		switch {
-		case r.Method == "GET" && r.URL.Path == "/shorten":
-			metricName = metrics.MetricGetShortUrlDuration
-		case r.Method == "DELETE" && r.URL.Path == "/shorten":
+		case r.Method == "POST" && r.URL.Path == "/":
+			metricName = metrics.MetricPostShortUrlDuration
+		case r.Method == "DELETE" && r.URL.Path == "/":
 			metricName = metrics.MetricDeleteShortUrlDuration
-		case r.Method == "GET" && len(r.URL.Path) > len("/shorten/") && r.URL.Path[:len("/shorten/")] == "/shorten/":
+		case r.Method == "GET" && r.URL.Path != "/":
 			metricName = metrics.MetricResolveShortUrlDuration
 		default:
 			return

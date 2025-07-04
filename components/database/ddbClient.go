@@ -58,7 +58,6 @@ func (d *DDBClient) SaveURL(ctx context.Context, hash string, original string) e
 	return err
 }
 
-// Recupera una URL por hash
 func (d *DDBClient) GetURL(ctx context.Context, hash string) (string, error) {
 	res, err := d.client.GetItemWithContext(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(d.tableName),

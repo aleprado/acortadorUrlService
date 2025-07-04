@@ -1,11 +1,11 @@
 package metrics
 
 const (
-	MetricGetShortUrlMissingParam  = "GetShortUrl_MissingParam"
-	MetricGetShortUrlError         = "GetShortUrl_Error"
-	MetricGetShortUrlSuccess       = "GetShortUrl_Success"
-	MetricGetShortUrlCreatedNew    = "GetShortUrl_CreatedNew"
-	MetricGetShortUrlFoundExisting = "GetShortUrl_FoundExisting"
+	MetricPostShortUrlMissingParam  = "PostShortUrl_MissingParam"
+	MetricPostShortUrlError         = "PostShortUrl_Error"
+	MetricPostShortUrlSuccess       = "PostShortUrl_Success"
+	MetricPostShortUrlCreatedNew    = "PostShortUrl_CreatedNew"
+	MetricPostShortUrlFoundExisting = "PostShortUrl_FoundExisting"
 
 	MetricDeleteShortUrlMissingParam = "DeleteShortUrl_MissingParam"
 	MetricDeleteShortUrlError        = "DeleteShortUrl_Error"
@@ -15,7 +15,7 @@ const (
 	MetricResolveShortUrlNotFound = "ResolveShortUrl_NotFound"
 	MetricResolveShortUrlSuccess  = "ResolveShortUrl_Success"
 
-	MetricGetShortUrlDuration     = "GetShortUrl_Duration"
+	MetricPostShortUrlDuration    = "PostShortUrl_Duration"
 	MetricDeleteShortUrlDuration  = "DeleteShortUrl_Duration"
 	MetricResolveShortUrlDuration = "ResolveShortUrl_Duration"
 )
